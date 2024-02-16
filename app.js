@@ -3,10 +3,11 @@ const express = require('express');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const logger = require('morgan');
-
 const indexRouter = require('./routes/index');
 const catalogRouter = require("./routes/catalog");
-
+const compression = require("compression");
+const helmet = require("helmet");
+const RateLimit = require("express-rate-limit");
 
 const app = express();
 
@@ -14,8 +15,12 @@ const app = express();
 const mongoose = require("mongoose");
 mongoose.set("strictQuery", false);
 
+
+const dev_db_url = "mongodb+srv://sebastianhothaza:Sebi050297@cluster0.6cldpv0.mongodb.net/local_library?retryWrites=true&w=majority";
+const mongoDB = process.env.MONGODB_URI || dev_db_url;
+
 main().catch((err) => console.log(err));
-async function main() {
+async function main() { 
   await mongoose.connect(mongoDB);
 }
 
@@ -25,11 +30,25 @@ app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'pug');
 
 // Adding the middleware libraries
+
+// Add helmet to the middleware chain.
+// Set CSP headers to allow our Bootstrap and Jquery to be served
+app.use(helmet.contentSecurityPolicy({directives: {"script-src": ["'self'","code.jquery.com","cdn.jsdelivr.net"]}}));
+
+// Apply rate limiter to all requests
+const limiter = RateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 30,
+});
+app.use(limiter);
+
 app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
+app.use(compression()); // Compress all routes
 app.use(express.static(path.join(__dirname, 'public')));
+
 
 app.use('/', indexRouter);
 app.use("/catalog", catalogRouter); // Add catalog routes to middleware chain.
